@@ -1,5 +1,8 @@
 from rest_framework import serializers
 from .models import User
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from collections import OrderedDict
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
@@ -22,8 +25,30 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data)
         return user
     
-class ProfileSerializer(serializers.ModelSerializer):
+class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username', 'first_name', 'last_name', 'email']
-        read_only_fields = ['username', 'email']
+        
+        extra_kwargs = {
+            'username': {'read_only': True},
+            'email': {'required': False},
+            'first_name': {'required': False},
+            'last_name': {'required': False},
+        }
+
+
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        original_data = super().validate(attrs)
+        
+        custom_data = OrderedDict()
+        
+        custom_data['username'] = self.user.username
+        custom_data['email'] = self.user.email
+        custom_data['first_name'] = self.user.first_name
+        custom_data['last_name'] = self.user.last_name
+        
+        custom_data.update(original_data)
+        
+        return custom_data
