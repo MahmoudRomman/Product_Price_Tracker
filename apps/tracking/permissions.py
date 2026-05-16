@@ -2,7 +2,7 @@ from rest_framework import permissions
 
 class IsAdminOrOwner(permissions.BasePermission):
     """
-    Only admin and product_link owner can edit or delete the product_link
+    Only admin and tracked_product owner can edit or delete the tracked_product
     but anyone can get any link
     """
     def has_object_permission(self, request, view, obj):
@@ -11,4 +11,4 @@ class IsAdminOrOwner(permissions.BasePermission):
             return True
 
         # only product link owner or admin can make (PUT, PATCH, DELETE)
-        return request.user.is_staff or (obj.added_by == request.user)
+        return request.user.is_staff or (obj.user == request.user)

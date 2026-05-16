@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from rest_framework.decorators import APIView, permission_classes
+from rest_framework.decorators import api_view, APIView, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser, IsAuthenticatedOrReadOnly
 from rest_framework import status
 from rest_framework.response import Response
@@ -9,6 +9,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from .permissions import IsAdminOrOwner
+from decimal import Decimal, InvalidOperation
 
 class ProductListCreateView(APIView):
     def get_permissions(self):
@@ -170,72 +171,83 @@ class ProductLinksRetrieveUpdateDestroyAPIView(APIView):
     def get(self, request, id):
         link = self.get_object(id)
         serializer = ProductLinkSerializer(link)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
     def patch(self, request, id):
-            link = self.get_object(id)
-            self.check_object_permissions(request, link)
-            
-            serializer = ProductLinkSerializer(link, data=request.data, partial=True)
-            
-            if serializer.is_valid():
-                product = serializer.validated_data.get('product', link.product)
-                retailer = serializer.validated_data.get('retailer', link.retailer)
+        link = self.get_object(id)
+        self.check_object_permissions(request, link)
+        
+        serializer = ProductLinkSerializer(link, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            product = serializer.validated_data.get('product', link.product)
+            retailer = serializer.validated_data.get('retailer', link.retailer)
 
-                # Check duplication (excluding the current link)
-                if ProductLink.objects.filter(product=product, retailer=retailer).exclude(id=id).exists():
-                    return Response(
-                        {"error": "This retailer link already exists for this product."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_200_OK)
+            # Check duplication (excluding the current link)
+            if ProductLink.objects.filter(product=product, retailer=retailer).exclude(id=id).exists():
+                return Response(
+                    {"error": "This retailer link already exists for this product."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     def put(self, request, id):
         return self.patch(request, id)
     
     def delete(self, request, pk):
-            link = self.get_object(pk)
-            self.check_object_permissions(request, link)
-            
-            link.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-class PriceHistoryListAPIView(APIView):
-    permission_classes = [AllowAny]
-    
-    def get(self, request, id):
-        try:
-            link = ProductLink.objects.get(id=id)
-        except ObjectDoesNotExist: 
-            return Response({'Message: ':f'The ProductLink with id: {id} is not found!'}, status=status.HTTP_404_NOT_FOUND)
+        link = self.get_object(pk)
+        self.check_object_permissions(request, link)
         
-        prices = PriceHistory.objects.filter(product_link=link)
-        serializer = PriceHistorySerializer(prices, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        link.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
+
+@api_view(['PATCH'])
+@permission_classes([IsAdminOrOwner])
+def update_product_link_price(request, id):
+    try:
+        link = ProductLink.objects.get(id=id)
+    except ProductLink.DoesNotExist:
+        return Response({'error': 'ProductLink not found!'}, status=status.HTTP_404_NOT_FOUND)
+    
+    new_price = request.data.get('last_known_price')
+    
+    if new_price is None:
+        return Response({'error': 'last_known_price is required!'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        new_price = Decimal(str(new_price))
+    except (InvalidOperation, ValueError):
+        return Response({'error': 'last_known_price must be a valid number!'}, status=status.HTTP_400_BAD_REQUEST)
+
+    link.last_known_price = new_price
+    if 'available' in request.data:
+        link.available = request.data.get('available')
+    
+    link.save()
+
+    return Response({
+        'message': 'Price updated successfully!',
+        'product': link.product.name,
+        'new_price': link.last_known_price
+    }, status=status.HTTP_200_OK)
 
 class PriceHistoryListAPIView(APIView):
     permission_classes = [AllowAny]
     
     def get(self, request, id):
         try:
-            # نتأكد إن اللينك موجود
             link = ProductLink.objects.get(id=id)
         except (ProductLink.DoesNotExist, Exception):
             raise Http404
         
-        # تحسين الـ Query لسحب بيانات المنتج والمتجر مرة واحدة
         prices = PriceHistory.objects.filter(product_link=link)\
             .select_related('product_link__product', 'product_link__retailer')\
             .order_by('timestamp')
             
         serializer = PriceHistorySerializer(prices, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-# /api/product_links/<id>/history/ (GET) - CBV ( ListAPIView )
-# Purpose: Retrieve the price history for a specific ProductLink .
-# Logic: Returns a chronological list of PriceHistory entries for
-# ProductLink with <id> .
