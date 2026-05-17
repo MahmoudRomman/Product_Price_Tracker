@@ -1,5 +1,19 @@
-venv/
-*.pyc
-__pycache__/
-db.sqlite3
+# Environments
+.env
 .venv
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Databases
+db.sqlite3
+
+# Static & Media
+static/
+media/
+
+# Celery
+celerybeat-schedule

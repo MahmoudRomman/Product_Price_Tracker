@@ -1,12 +1,13 @@
 from rest_framework import serializers
 from apps.tracking.models import UserProductTracking, Notification
 from apps.products.serializers import ProductLinkSerializer
-from apps.users.serializers import UserProductTracking, Notification
+from .serializers import UserProductTracking, Notification
 
 
 
 class UserProductTrackingSerializer(serializers.ModelSerializer):
     product_link_details = ProductLinkSerializer(source='product_link', read_only=True)
+    user = serializers.ReadOnlyField(source='user.username')
 
     class Meta:
         model = UserProductTracking
