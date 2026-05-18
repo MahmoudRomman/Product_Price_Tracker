@@ -10,14 +10,29 @@ from .permissions import IsAdminOrOwner
 from apps.products.models import ProductLink, PriceHistory
 from apps.products.serializers import ProductLink, PriceHistorySerializer
 from django.db.models import Max, Min
-
+from django_filters.rest_framework import DjangoFilterBackend 
+from rest_framework.filters import SearchFilter, OrderingFilter
+from .filters import UserProductTrackingFilter, NotificationsFilter
 
 class ProductTrackingListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
+    filterset_classes = UserProductTrackingFilter
+    search_fields = ['product_link__product__name', 'product_link__retailer__name']
+    ordering_fields = ['created_at']
 
     def get(self, request):
-        tracked_products = UserProductTracking.objects.filter(user=request.user)
-        serializer = UserProductTrackingSerializer(tracked_products, many=True)
+        queryset = UserProductTracking.objects.filter(user=request.user)
+
+        backends = [
+            DjangoFilterBackend(),
+            SearchFilter(),
+            OrderingFilter()
+        ]
+
+        for backend in backends:
+            queryset = backend.filter_queryset(request, queryset, view=self)
+
+        serializer = UserProductTrackingSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def post(self, request):
@@ -47,6 +62,8 @@ class ProductTrackingRetrieveUpdateDestroyAPIView(APIView):
         
     def get(self, request, id):
         tracked_product = self.get_object(id)
+
+        backend = DjangoFilterBackend
         serializer = UserProductTrackingSerializer(tracked_product, many=False)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
@@ -86,10 +103,15 @@ class ProductTrackingRetrieveUpdateDestroyAPIView(APIView):
 
 class NotificationListAPIView(APIView):
     permission_classes = [IsAuthenticated]
+    filterset_classes = NotificationsFilter
     
     def get(self, request):
-        notifications = Notification.objects.filter(user=request.user).order_by('-sent_at')
-        serializer = NotificationSerializer(notifications, many=True)
+        queryset = Notification.objects.filter(user=request.user).order_by('-sent_at')
+
+        backend = DjangoFilterBackend()
+        queryset = backend.filter_queryset(request, queryset, view=self)
+
+        serializer = NotificationSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 class NotificationReadAPIView(APIView):

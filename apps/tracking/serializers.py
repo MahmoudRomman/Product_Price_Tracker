@@ -7,12 +7,13 @@ from .serializers import UserProductTracking, Notification
 
 class UserProductTrackingSerializer(serializers.ModelSerializer):
     product_link_details = ProductLinkSerializer(source='product_link', read_only=True)
+    product_name = serializers.ReadOnlyField(source='product_link.product.name')
     user = serializers.ReadOnlyField(source='user.username')
 
     class Meta:
         model = UserProductTracking
         fields = [
-            'id', 'user', 'product_link', 'product_link_details', 
+            'id', 'user', 'product_link', 'product_name', 'product_link_details', 
             'target_price', 'notification_enabled', 'created_at', 'updated_at'
         ]
         extra_kwargs = {
