@@ -11,7 +11,16 @@ from django.shortcuts import get_object_or_404
 from .permissions import IsAdminOrOwner
 from decimal import Decimal, InvalidOperation
 
+from django_filters.rest_framework import DjangoFilterBackend 
+from rest_framework.filters import SearchFilter, OrderingFilter
+from .filters import ProductFilter, ProductLinksFilter, PriceHistoryFilter
+
+
 class ProductListCreateView(APIView):
+    filterset_classes = ProductFilter
+    search_fields = ['name', 'description']
+    ordering_fields = ['name']
+
     def get_permissions(self):
         if self.request.method == 'GET':
             return [AllowAny()]
@@ -20,9 +29,20 @@ class ProductListCreateView(APIView):
         return super().get_permissions()
 
     def get(self, request):
-        products = Product.objects.all() # to be paginated later
-        serializer = ProductSerializer(products, many=True)
+        queryset = Product.objects.all() # to be paginated later
+
+        backends = [
+            DjangoFilterBackend(),
+            SearchFilter(),
+            OrderingFilter()
+        ]
+
+        for backend in backends:
+            queryset = backend.filter_queryset(request, queryset, view=self)
+
+        serializer = ProductSerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
     
     def post(self, request):
         serializer = ProductSerializer(data=request.data)
@@ -134,13 +154,27 @@ class RetailersRetrieveUpdateDestroyAPIView(APIView):
 
 class ProductLinksListCreateAPIView(APIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
+    filterset_classes = ProductLinksFilter
+    search_fields = ['product__name', 'product__description']
+    ordering_fields = ['last_known_price', 'created_at']
 
     def get(self, request, product_id):
         product = get_object_or_404(Product, id=product_id)
-        links = ProductLink.objects.filter(product=product)
-        serializer = ProductLinkSerializer(links, many=True)
-        return Response(serializer.data)
+        queryset = ProductLink.objects.filter(product=product)
+
+        backends = [
+            DjangoFilterBackend(),
+            SearchFilter(),
+            OrderingFilter()
+        ]
+
+        for backend in backends:
+            queryset = backend.filter_queryset(request, queryset, view=self)
+
+        serializer = ProductLinkSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
+
     def post(self, request, product_id):
         product = get_object_or_404(Product, id=product_id)
         data = request.data.copy()
@@ -236,18 +270,33 @@ def update_product_link_price(request, id):
         'new_price': link.last_known_price
     }, status=status.HTTP_200_OK)
 
+
+
 class PriceHistoryListAPIView(APIView):
     permission_classes = [AllowAny]
-    
+    filterset_classes = PriceHistoryFilter
+    search_fields = ['price']
+    ordering_fields = ['timestamp']
+
     def get(self, request, id):
         try:
             link = ProductLink.objects.get(id=id)
         except (ProductLink.DoesNotExist, Exception):
             raise Http404
         
-        prices = PriceHistory.objects.filter(product_link=link)\
+        queryset = PriceHistory.objects.filter(product_link=link)\
             .select_related('product_link__product', 'product_link__retailer')\
             .order_by('timestamp')
+        
+        backends = [
+            DjangoFilterBackend(),
+            SearchFilter(),
+            OrderingFilter()
+        ]
+
+        for backend in backends:
+            queryset = backend.filter_queryset(request, queryset, view=self)
             
-        serializer = PriceHistorySerializer(prices, many=True)
+        serializer = PriceHistorySerializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
