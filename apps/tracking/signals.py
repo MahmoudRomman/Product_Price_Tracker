@@ -51,4 +51,4 @@ def handle_price_change(sender, instance, created, **kwargs):
                 price_at_notification=instance.last_known_price
             )
 
-            send_price_alert_email.delay(notification.id)
+            send_price_alert_email.delay(notification.id)ئ

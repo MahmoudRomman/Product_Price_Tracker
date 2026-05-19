@@ -55,3 +55,26 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification for {self.user.email} - {self.sent_at}"
+    
+
+
+class EmployeeTask(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    employee = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='current_tasks'
+    )
+    product_link = models.ForeignKey(ProductLink, on_delete=models.CASCADE, related_name='assigned_tasks')
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    is_completed = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-assigned_at']
+        constraints = [
+            models.UniqueConstraint(fields=['employee', 'product_link', 'is_completed'], name='unique_active_employee_task')
+        ]
+
+    def __str__(self):
+        status = "Completed" if self.is_completed else "Pending"
+        return f"{self.employee.username} - {self.product_link.product.name} ({status})"

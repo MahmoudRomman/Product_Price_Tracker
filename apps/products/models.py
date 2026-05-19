@@ -52,6 +52,9 @@ class ProductLink(models.Model):
             blank=True,
             related_name='added_links'
         )
+    
+    update_interval_hours = models.IntegerField(default=2)
+    next_update_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.product.name} at {self.retailer.name}"
