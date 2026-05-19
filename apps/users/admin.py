@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import User
-# Register your models here.
+from .models import User, WorkDay, EmployeeShift
+
 
 admin.site.register(User)
+admin.site.register(WorkDay)
+admin.site.register(EmployeeShift)
