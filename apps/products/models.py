@@ -54,7 +54,7 @@ class ProductLink(models.Model):
         )
     
     update_interval_hours = models.IntegerField(default=2)
-    next_update_at = models.DateTimeField(auto_now_add=True)
+    next_update_at = models.DateTimeField(auto_now_add=True, null=True)
 
     def __str__(self):
         return f"{self.product.name} at {self.retailer.name}"

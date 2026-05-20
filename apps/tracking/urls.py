@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     ProductTrackingListCreateAPIView, ProductTrackingRetrieveUpdateDestroyAPIView,
     NotificationListAPIView, NotificationReadAPIView, tracking_statistics,
+    employee_tasks
 )
 
 urlpatterns = [
@@ -11,6 +12,7 @@ urlpatterns = [
     path('my_notifications/<uuid:id>/mark_read/', NotificationReadAPIView.as_view(), name='notification_readed'),
 
     path('my_stats/', tracking_statistics, name='tracking_statistics'),
+    path('tasks/', employee_tasks, name='employee_tasks'),
 
 ]
 

@@ -1,7 +1,6 @@
 from rest_framework import serializers
-from apps.tracking.models import UserProductTracking, Notification
 from apps.products.serializers import ProductLinkSerializer
-from .serializers import UserProductTracking, Notification
+from .models import UserProductTracking, Notification, EmployeeTask
 
 
 
@@ -34,3 +33,28 @@ class NotificationSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'user_product_tracking': {'write_only': True}
         }
+
+
+
+class EmployeeTaskSerializer(serializers.ModelSerializer):
+    task_id = serializers.UUIDField(source='id')
+    link_id = serializers.UUIDField(source='product_link.id')
+    product_name = serializers.CharField(source='product_link.product.name')
+    product_image = serializers.URLField(source='product_link.product.image_url')
+    retailer_name = serializers.CharField(source='product_link.retailer.name')
+    product_link_url = serializers.URLField(source='product_link.url')
+    
+    product_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmployeeTask
+        fields = [
+            'task_id', 'link_id', 'product_name', 'product_image', 
+            'retailer_name', 'product_price', 'product_link_url', 'assigned_at'
+        ]
+
+    def get_product_price(self, obj):
+        link = obj.product_link
+        if link.last_known_price is not None:
+            return f"{link.last_known_price} {link.currency}"
+        return f"0.00 {link.currency}"
