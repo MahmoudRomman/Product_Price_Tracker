@@ -4,8 +4,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import Http404
-from .models import UserProductTracking, Notification
-from .serializers import UserProductTrackingSerializer, NotificationSerializer
+from .models import UserProductTracking, Notification, EmployeeTask
+    # استخدام السيريالايزر لتجهيز الداتا
+from .serializers import UserProductTrackingSerializer, NotificationSerializer, EmployeeTaskSerializer
 from .permissions import IsAdminOrOwner
 from apps.products.models import ProductLink, PriceHistory
 from apps.products.serializers import ProductLink, PriceHistorySerializer
@@ -178,3 +179,53 @@ def tracking_statistics(request):
 
     return Response(response_data, status=status.HTTP_200_OK)
 
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def employee_tasks(request):
+    user = request.user
+
+    tasks = EmployeeTask.objects.filter(employee=user).select_related(
+        'product_link__product', 'product_link__retailer'
+    )
+
+    employee_tasks = []
+    
+    for task in tasks:
+        employee_tasks.append(
+            {
+             'product_name' : task.product_link.product.name,
+             'product_image' : task.product_link.product.image_url,
+             'retailer_name' : task.product_link.retailer.name,
+             'product_price' : f"{task.product_link.last_known_price} {task.product_link.currency}",
+             'product_link' : task.product_link.url,
+            }
+        )
+
+    if not employee_tasks:
+        return Response({'Messgae: ' : 'Not available tasks!'}, status=status.HTTP_200_OK)
+    
+    return Response(employee_tasks, status=status.HTTP_200_OK)
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def employee_tasks(request):
+    tasks = EmployeeTask.objects.filter(
+        employee=request.user,
+        is_completed=False
+    ).select_related(
+        'product_link__product', 
+        'product_link__retailer'
+    ).order_by('-assigned_at')
+
+    if not tasks.exists():
+        return Response({'message': 'No pending tasks available for you right now.'}, status=status.HTTP_200_OK)
+    
+    serializer = EmployeeTaskSerializer(tasks, many=True)
+    
+    return Response(serializer.data, status=status.HTTP_200_OK)

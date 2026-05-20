@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser, I
 from rest_framework import status
 from rest_framework.response import Response
 from .models import Product, Retailer, ProductLink, PriceHistory
+from apps.tracking.models import EmployeeTask
 from .serializers import ProductSerializer, RetailerSerializer, ProductLinkSerializer, PriceHistorySerializer
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.http import Http404
@@ -263,6 +264,12 @@ def update_product_link_price(request, id):
         link.available = request.data.get('available')
     
     link.save()
+
+    EmployeeTask.objects.filter(
+        employee=request.user, 
+        product_link=link, 
+        is_completed=False
+    ).update(is_completed=True)
 
     return Response({
         'message': 'Price updated successfully!',
