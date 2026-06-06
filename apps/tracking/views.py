@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from rest_framework.decorators import api_view, APIView, permission_classes
+from rest_framework.decorators import api_view, APIView, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -14,6 +14,13 @@ from django.db.models import Max, Min
 from django_filters.rest_framework import DjangoFilterBackend 
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .filters import UserProductTrackingFilter, NotificationsFilter
+from rest_framework.pagination import PageNumberPagination
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 20
+
 
 class ProductTrackingListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -33,8 +40,12 @@ class ProductTrackingListCreateAPIView(APIView):
         for backend in backends:
             queryset = backend.filter_queryset(request, queryset, view=self)
 
-        serializer = UserProductTrackingSerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        paginator = StandardResultsSetPagination()
+        paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
+
+        serializer = UserProductTrackingSerializer(paginated_queryset, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
     
     def post(self, request):
         serializer = UserProductTrackingSerializer(data=request.data)
@@ -112,8 +123,12 @@ class NotificationListAPIView(APIView):
         backend = DjangoFilterBackend()
         queryset = backend.filter_queryset(request, queryset, view=self)
 
-        serializer = NotificationSerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        paginator = StandardResultsSetPagination()
+        paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
+
+        serializer = NotificationSerializer(paginated_queryset, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
 
 class NotificationReadAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -181,39 +196,9 @@ def tracking_statistics(request):
 
 
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def employee_tasks(request):
-    user = request.user
-
-    tasks = EmployeeTask.objects.filter(employee=user).select_related(
-        'product_link__product', 'product_link__retailer'
-    )
-
-    employee_tasks = []
-    
-    for task in tasks:
-        employee_tasks.append(
-            {
-             'product_name' : task.product_link.product.name,
-             'product_image' : task.product_link.product.image_url,
-             'retailer_name' : task.product_link.retailer.name,
-             'product_price' : f"{task.product_link.last_known_price} {task.product_link.currency}",
-             'product_link' : task.product_link.url,
-            }
-        )
-
-    if not employee_tasks:
-        return Response({'Messgae: ' : 'Not available tasks!'}, status=status.HTTP_200_OK)
-    
-    return Response(employee_tasks, status=status.HTTP_200_OK)
-
-
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@throttle_classes([])
 def employee_tasks(request):
     tasks = EmployeeTask.objects.filter(
         employee=request.user,
@@ -226,6 +211,9 @@ def employee_tasks(request):
     if not tasks.exists():
         return Response({'message': 'No pending tasks available for you right now.'}, status=status.HTTP_200_OK)
     
-    serializer = EmployeeTaskSerializer(tasks, many=True)
-    
-    return Response(serializer.data, status=status.HTTP_200_OK)
+
+    paginator = StandardResultsSetPagination()
+    paginated_tasks = paginator.paginate_queryset(tasks, request)
+
+    serializer = EmployeeTaskSerializer(paginated_tasks, many=True)
+    return paginator.get_paginated_response(serializer.data)

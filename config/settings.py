@@ -141,11 +141,22 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
-    # # This will works good with generics and viewsets only
-    # 'DEFAULT_FILTER_BACKENDS': [
-    #     'django_filters.rest_framework.DjangoFilterBackend',
-    # ],
+
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '20/minute',
+        'user': '100/minute',
+        
+        'sensitive_login': '5/minute', 
+    },
+
+    'DEFAULT_THROTTLE_CACHE': 'default',
 }
+
 
 
 # Cache Configurations
