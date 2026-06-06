@@ -15,10 +15,16 @@ from decimal import Decimal, InvalidOperation
 from django_filters.rest_framework import DjangoFilterBackend 
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .filters import ProductFilter, ProductLinksFilter, PriceHistoryFilter
+from rest_framework.pagination import PageNumberPagination
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 20
 
 
 class ProductListCreateView(APIView):
-    filterset_classes = ProductFilter
+    filterset_class = ProductFilter
     search_fields = ['name', 'description']
     ordering_fields = ['name']
 
@@ -30,8 +36,9 @@ class ProductListCreateView(APIView):
         return super().get_permissions()
 
     def get(self, request):
-        queryset = Product.objects.all() # to be paginated later
+        queryset = Product.objects.all()
 
+        #1- to apply different filters
         backends = [
             DjangoFilterBackend(),
             SearchFilter(),
@@ -41,8 +48,15 @@ class ProductListCreateView(APIView):
         for backend in backends:
             queryset = backend.filter_queryset(request, queryset, view=self)
 
-        serializer = ProductSerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        #2- to paginate the queryset
+        paginator = StandardResultsSetPagination()
+        paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
+
+        #3- to serialize the queryset
+        serializer = ProductSerializer(paginated_queryset, many=True)
+
+        #4- to return the paginated response
+        return paginator.get_paginated_response(serializer.data)
     
     
     def post(self, request):
@@ -101,9 +115,13 @@ class RetailersListCreateAPIView(APIView):
         return super().get_permissions()
     
     def get(self, request):
-        retailers = Retailer.objects.all() # to be paginated later
-        serializer = RetailerSerializer(retailers, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        queryset = Retailer.objects.all()
+
+        paginator = StandardResultsSetPagination()
+        paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
+
+        serializer = RetailerSerializer(paginated_queryset, many=True)
+        return paginator.get_paginated_response(serializer.data)
     
     def post(self, request):
         serializer = RetailerSerializer(data=request.data)
@@ -172,8 +190,11 @@ class ProductLinksListCreateAPIView(APIView):
         for backend in backends:
             queryset = backend.filter_queryset(request, queryset, view=self)
 
-        serializer = ProductLinkSerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        paginator = StandardResultsSetPagination()
+        paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
+
+        serializer = ProductLinkSerializer(paginated_queryset, many=True)
+        return paginator.get_paginated_response(serializer.data)
     
 
     def post(self, request, product_id):
@@ -303,7 +324,10 @@ class PriceHistoryListAPIView(APIView):
 
         for backend in backends:
             queryset = backend.filter_queryset(request, queryset, view=self)
+
+        paginator = StandardResultsSetPagination()
+        paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
+
+        serializer = PriceHistorySerializer(paginated_queryset, many=True)
+        return paginator.get_paginated_response(serializer.data)
             
-        serializer = PriceHistorySerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    

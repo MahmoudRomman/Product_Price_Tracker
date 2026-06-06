@@ -3,8 +3,18 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import RegisterSerializer, UserProfileSerializer
-from django.core.exceptions import ObjectDoesNotExist
-from .models import User
+from apps.users.serializers import MyTokenObtainPairSerializer
+from rest_framework.throttling import ScopedRateThrottle 
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+# This view I use in the main url.py for the project, 
+# I override it here to make an edit in the #api/users/login url
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'sensitive_login'
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
